@@ -24,6 +24,7 @@ export default function AuthForm({ type = 'login' }) {
     register,
     handleSubmit,
     formState: { errors },
+    setError
   } = useForm({
     resolver: zodResolver(authSchema),
   })
@@ -59,7 +60,9 @@ export default function AuthForm({ type = 'login' }) {
       // other success logic for login/forgot
     },
     onError: (error) => {
+      console.log(error?.response?.data?.message);
       toast.error(error?.response?.data?.message || 'Something went wrong')
+      setError('root.serverError', { type: 'server', message })
     },
   })
 
@@ -69,6 +72,11 @@ export default function AuthForm({ type = 'login' }) {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      {errors.root?.serverError && (
+        <div className="mb-4 rounded bg-red-100 border border-red-400 px-4 py-2 text-red-700 text-center">
+          {errors.root.serverError.message}
+        </div>
+      )}
       {showOtpField ? (
         <OtpInput
           email={registeredEmail}
