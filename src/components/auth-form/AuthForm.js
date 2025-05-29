@@ -12,6 +12,7 @@ import Link from 'next/link'
 import { useMutation } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import api from '@/utils/api'
+import { useRouter } from 'next/navigation'
 
 export default function AuthForm({ type = 'login' }) {
   const isRegister = type === 'register'
@@ -19,6 +20,9 @@ export default function AuthForm({ type = 'login' }) {
   const [showOtpField, setShowOtpField] = useState(false)
   const [registeredEmail, setRegisteredEmail] = useState('')
   const [otpLoading, setOtpLoading] = useState(false)
+  const [resendOtpLoading, setResendOtpLoading] = useState(false)
+  const [otpVerified, setOtpVerified] = useState(false)
+  const router = useRouter()
 
   const {
     register,
@@ -33,12 +37,24 @@ export default function AuthForm({ type = 'login' }) {
     setOtpLoading(true)
     try {
       await api.post('/auth/verify-otp', { email: registeredEmail, otp })
+      setOtpVerified(true)
       toast.success('OTP Verified!')
-      // Redirect or log in the user here
+      setTimeout(() => router.push('/login'), 1200) // Let the user see the "Verified" state
     } catch (err) {
       toast.error(err?.response?.data?.message || 'OTP verification failed')
     }
     setOtpLoading(false)
+  }
+
+  const handleResendOtp = async () => {
+    setResendOtpLoading(true)
+    try {
+      await api.post('/auth/resend-otp', { email: registeredEmail })
+      toast.success('OTP resent!')
+    } catch (err) {
+      toast.error(err?.response?.data?.message || 'Failed to resend OTP')
+    }
+    setResendOtpLoading(false)
   }
 
   const mutation = useMutation({
@@ -60,9 +76,9 @@ export default function AuthForm({ type = 'login' }) {
       // other success logic for login/forgot
     },
     onError: (error) => {
-      console.log(error?.response?.data?.message);
       toast.error(error?.response?.data?.message || 'Something went wrong')
-      setError('root.serverError', { type: 'server', message })
+      setError('root.serverError', { type: 'server', message: error?.response?.data?.message })
+      setTimeout(() => router.push('/login'), 1200)
     },
   })
 
@@ -71,9 +87,9 @@ export default function AuthForm({ type = 'login' }) {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
       {errors.root?.serverError && (
-        <div className="mb-4 rounded bg-red-100 border border-red-400 px-4 py-2 text-red-700 text-center">
+        <div className="w-full max-w-lg mx-auto mb-4 rounded bg-red-100 border border-red-400 px-4 py-2 text-red-700 text-center">
           {errors.root.serverError.message}
         </div>
       )}
@@ -82,6 +98,9 @@ export default function AuthForm({ type = 'login' }) {
           email={registeredEmail}
           onVerify={handleVerifyOtp}
           loading={otpLoading}
+          onResend={handleResendOtp}
+          resendLoading={resendOtpLoading}
+          verified={otpVerified}
         />
       ) : (
         <Card className="w-full max-w-lg shadow-2xl p-8 rounded-2xl">

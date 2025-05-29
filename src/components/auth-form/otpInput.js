@@ -1,27 +1,41 @@
-import { useRef, useState } from 'react'
+import { useRef, useState, useEffect } from 'react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 
-const OTP_LENGTH = 6 // Change this for 4/5/6 digit OTP
+const OTP_LENGTH = 6
+const RESEND_INTERVAL = 30 // seconds
 
-export default function OtpInput({ email, onVerify, loading }) {
+export default function OtpInput({ email, onVerify, loading, onResend, resendLoading, verified }) {
   const [otpValues, setOtpValues] = useState(Array(OTP_LENGTH).fill(''))
   const inputsRef = useRef([])
+  const [timer, setTimer] = useState(RESEND_INTERVAL)
 
-  // Handle change in one input box
+  useEffect(() => {
+    if (timer === 0) return
+    const interval = setInterval(() => setTimer(t => t - 1), 1000)
+    return () => clearInterval(interval)
+  }, [timer])
+
+  // Reset timer when resend triggered
+  const handleResend = async () => {
+    if (timer === 0 && onResend) {
+      await onResend()
+      setTimer(RESEND_INTERVAL)
+      setOtpValues(Array(OTP_LENGTH).fill(''))
+      inputsRef.current[0]?.focus()
+    }
+  }
+
   const handleChange = (idx, val) => {
-    if (!/^[0-9]?$/.test(val)) return // Only digits, allow backspace
+    if (!/^[0-9]?$/.test(val)) return
     const newOtp = [...otpValues]
     newOtp[idx] = val
     setOtpValues(newOtp)
-
-    // Move to next box if current is filled
     if (val && idx < OTP_LENGTH - 1) {
       inputsRef.current[idx + 1]?.focus()
     }
   }
 
-  // On backspace, move to previous box if empty
   const handleKeyDown = (idx, e) => {
     if (e.key === 'Backspace' && !otpValues[idx] && idx > 0) {
       const prev = inputsRef.current[idx - 1]
@@ -40,12 +54,10 @@ export default function OtpInput({ email, onVerify, loading }) {
     }
   }
 
-  // Paste entire OTP
   const handlePaste = (e) => {
     const pasted = e.clipboardData.getData('Text').replace(/\D/g, '').slice(0, OTP_LENGTH)
     if (pasted.length) {
       setOtpValues(pasted.split('').concat(Array(OTP_LENGTH - pasted.length).fill('')))
-      // Focus last box
       setTimeout(() => {
         inputsRef.current[Math.min(pasted.length, OTP_LENGTH) - 1]?.focus()
       }, 0)
@@ -77,16 +89,40 @@ export default function OtpInput({ email, onVerify, loading }) {
             ref={el => inputsRef.current[idx] = el}
             className="w-12 h-12 text-2xl text-center border-2 border-gray-300 rounded focus:border-blue-500 transition-all"
             autoFocus={idx === 0}
+            disabled={verified}
           />
         ))}
       </div>
       <Button
         type="submit"
-        className="w-full text-lg py-2.5"
-        disabled={loading || otpValues.some(d => d === '')}
+        className="w-full text-lg py-2.5 flex items-center justify-center"
+        disabled={loading || otpValues.some(d => d === '') || verified}
+        style={verified ? { backgroundColor: '#16a34a', borderColor: '#16a34a' } : {}}
       >
-        {loading ? 'Verifying...' : 'Verify OTP'}
+        {verified ? (
+          <>
+            <svg className="w-5 h-5 mr-2 text-white" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+            Verified
+          </>
+        ) : loading ? 'Verifying...' : 'Verify OTP'}
       </Button>
+      <div className="text-center mt-2">
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full"
+          disabled={timer > 0 || resendLoading || verified}
+          onClick={handleResend}
+        >
+          {timer > 0
+            ? `Resend OTP in ${timer}s`
+            : resendLoading
+              ? 'Resending...'
+              : 'Resend OTP'}
+        </Button>
+      </div>
     </form>
   )
 }
